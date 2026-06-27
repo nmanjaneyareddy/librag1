@@ -13,7 +13,7 @@ def _make_llm():
 
     return ChatOpenAI(
         model="deepseek-chat",
-        temperature=0.2,
+        temperature=0.3,
         max_tokens=512,
         api_key=api_key,
         base_url="https://api.deepseek.com/v1",
