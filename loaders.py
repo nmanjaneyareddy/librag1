@@ -3,12 +3,21 @@ from pathlib import Path
 from langchain_community.document_loaders import PyPDFLoader, BSHTMLLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-DATA_DIR = "data"
 BASE_DIR = Path(__file__).resolve().parent
 SUPPORTED_EXTENSIONS = {".pdf", ".html", ".htm", ".txt", ".md"}
 
+def _candidate_data_dirs():
+    return [
+        BASE_DIR / "data",
+        BASE_DIR / "documents",
+        BASE_DIR,
+        Path.cwd() / "data",
+        Path.cwd() / "documents",
+        Path.cwd(),
+    ]
+
 def _load_file(path):
-    ext = os.path.splitext(path)[1].lower()
+    ext = path.suffix.lower()
 
     if ext == ".pdf":
         return PyPDFLoader(str(path)).load()
@@ -21,28 +30,35 @@ def _load_file(path):
 
     return []
 
-def load_documents(data_dir=DATA_DIR):
+def load_documents(data_dir=None):
     docs = []
+    searched_dirs = []
 
-    data_path = Path(data_dir)
+    candidate_dirs = [Path(data_dir)] if data_dir else _candidate_data_dirs()
 
-    if not data_path.is_absolute():
-        data_path = BASE_DIR / data_path
+    for data_path in candidate_dirs:
+        if not data_path.is_absolute():
+            data_path = BASE_DIR / data_path
 
-    if not data_path.is_dir():
-        raise FileNotFoundError("Data directory not found: " + str(data_path))
+        searched_dirs.append(str(data_path))
 
-    for root, _, files in os.walk(data_path):
-        for file_name in sorted(files):
-            path = Path(root) / file_name
+        if not data_path.is_dir():
+            continue
 
-            if path.suffix.lower() in SUPPORTED_EXTENSIONS:
-                docs.extend(_load_file(path))
+        for root, _, files in os.walk(data_path):
+            for file_name in sorted(files):
+                path = Path(root) / file_name
 
-    if not docs:
-        raise ValueError("No supported documents found in " + str(data_path) + ".")
+                if path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                    docs.extend(_load_file(path))
 
-    return docs
+        if docs:
+            return docs
+
+    raise FileNotFoundError(
+        "No supported documents found. Checked these folders: "
+        + ", ".join(searched_dirs)
+    )
 
 def split_documents(docs, chunk_size=1000, chunk_overlap=150):
     splitter = RecursiveCharacterTextSplitter(
